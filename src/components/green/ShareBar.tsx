@@ -12,9 +12,14 @@ interface ShareBarProps {
 
 const ShareBar: React.FC<ShareBarProps> = ({ userName, co2SavedKg }) => {
   const shareRef = useRef<HTMLDivElement>(null);
-  const shareText = useMemo(() =>
-    encodeURIComponent(`${userName} just saved ${co2SavedKg.toFixed(1)} kg of CO₂ with Green Commute! 🌿\nJoin me: ${window.location.href}`),
-  [userName, co2SavedKg]);
+  const shareText = useMemo(
+    () => encodeURIComponent(`${userName} just saved ${co2SavedKg.toFixed(1)} kg of CO₂ with Green Commute! 🌿\nJoin me: ${window.location.href}`),
+    [userName, co2SavedKg]
+  );
+  const shareTextPlain = useMemo(
+    () => `${userName} just saved ${co2SavedKg.toFixed(1)} kg of CO₂ with Green Commute! 🌿\nJoin me: ${window.location.href}`,
+    [userName, co2SavedKg]
+  );
 
   const handleSaveCard = async () => {
     if (!shareRef.current) return;
@@ -27,6 +32,40 @@ const ShareBar: React.FC<ShareBarProps> = ({ userName, co2SavedKg }) => {
       toast({ title: "Share card saved!", description: "Share it on your favorite social apps." });
     } catch (e) {
       toast({ title: "Could not generate image", description: "Please try again." });
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!shareRef.current) return;
+    try {
+      const blob = await htmlToImage.toBlob(shareRef.current, { pixelRatio: 2 });
+      if (!blob) throw new Error("Could not generate image");
+      const fileName = `green-commute-${userName.replace(/\s+/g, "-").toLowerCase()}.png`;
+      const file = new File([blob], fileName, { type: "image/png" });
+
+      const shareData: any = {
+        files: [file],
+        title: "Green Commute Milestone",
+        text: shareTextPlain,
+      };
+
+      if ((navigator as any).canShare?.(shareData)) {
+        await (navigator as any).share(shareData);
+        toast({ title: "Shared!", description: "Thanks for inspiring others." });
+      } else if (navigator.share) {
+        await navigator.share({ title: "Green Commute Milestone", text: shareTextPlain });
+        toast({ title: "Shared!", description: "Image download is available if needed." });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Download ready", description: "Upload the image to Instagram or your favorite app." });
+      }
+    } catch {
+      toast({ title: "Sharing not available", description: "We couldn't open the share menu. Try downloading the image instead." });
     }
   };
 
@@ -64,7 +103,7 @@ const ShareBar: React.FC<ShareBarProps> = ({ userName, co2SavedKg }) => {
         </Button>
         <Button
           variant="share"
-          onClick={handleSaveCard}
+          onClick={handleNativeShare}
           aria-label="Share to Instagram"
           className="hover-scale"
         >
